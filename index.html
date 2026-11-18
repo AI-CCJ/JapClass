@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日语词汇学习助手 - 多章节版</title>
+    <!-- 引入 SheetJS 库，用于解析多 Sheet Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #007aff;
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 侧边栏：章节（Sheet）总览 */
+        aside {
+            width: 300px;
+            background-color: var(--card-bg);
+            border-right: 1px solid #e5e5e7;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .sidebar-header h2 {
+            font-size: 18px;
+            margin: 0;
+            color: var(--primary-color);
+        }
+
+        .sheet-total-badge {
+            font-size: 12px;
+            background: #e1f5fe;
+            color: #0288d1;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .sheet-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .sheet-item {
+            padding: 14px 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f9f9fb;
+            border: 1px solid transparent;
+        }
+
+        .sheet-item:hover {
+            background-color: #f0f0f5;
+        }
+
+        .sheet-item.active {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25);
+        }
+
+        .sheet-count {
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.08);
+            padding: 3px 8px;
+            border-radius: 12px;
+        }
+
+        .sheet-item.active .sheet-count {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+        }
+
+        .teacher-tools {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .teacher-tools h3 {
+            font-size: 13px;
+            margin: 0 0 5px 0;
+            color: #666;
+        }
+
+        /* 主体内容区 */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 25px 35px;
+            overflow-y: auto;
+            background-color: #fafafc;
+            box-sizing: border-box;
+        }
+
+        /* 顶部进度条区域（当前 Sheet 进度） */
+        .progress-wrapper {
+            margin-bottom: 20px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e5e5e7;
+            border-radius: 6px;
+            height: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* 学习卡片 */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 35px 40px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .word-display {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .word-display h1 {
+            font-size: 48px;
+            margin: 5px 0 12px 0;
+            color: #1d1d1f;
+        }
+
+        .word-reading {
+            font-size: 22px;
+            color: var(--primary-color);
+            min-height: 28px;
+        }
+
+        .badges {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e1f5fe;
+            color: #0288d1;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .badge-pos {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .info-section {
+            background: #f9f9fb;
+            padding: 18px 22px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .info-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .info-section p {
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .control-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            margin-top: 10px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 22px;
+            border-radius: 10px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            font-weight: 500;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background-color: #e5e5e7;
+            color: #333;
+        }
+
+        .btn-success {
+            background-color: #34c759;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 侧边栏：章节（Sheet）概览 -->
+    <aside>
+        <div class="sidebar-header">
+            <h2>📚 学习单元</h2>
+            <span id="sheetTotalBadge" class="sheet-total-badge">共 1 个单元</span>
+        </div>
+        
+        <ul id="sheetList" class="sheet-list">
+            <!-- 动态生成各个 Sheet 名称 -->
+        </ul>
+
+        <div class="teacher-tools">
+            <h3>👩‍🏫 资料管理</h3>
+            <button class="btn-secondary" onclick="exportJSON()">📤 导出学习包 (.json)</button>
+            <button class="btn-success" onclick="document.getElementById('fileInput').click()">📥 导入 Excel / JSON</button>
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv, .json" style="display: none;" onchange="handleFileImport(event)">
+        </div>
+    </aside>
+
+    <!-- 主学习区 -->
+    <main>
+        <!-- 顶部当前 Sheet 进度条 -->
+        <div class="progress-wrapper">
+            <div class="progress-info">
+                <span id="currentSheetName">当前单元：默认示例单元</span>
+                <span id="progressText">进度：1 / 2 (50%)</span>
+            </div>
+            <div class="progress-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+        </div>
+
+        <!-- 单词学习卡片 -->
+        <div class="card">
+            <div class="word-display">
+                <div id="wordReading" class="word-reading">あいにく</div>
+                <h1 id="wordTitle">生憎</h1>
+                <div class="badges">
+                    <span id="wordJlpt" class="badge">N3</span>
+                    <span id="wordPos" class="badge badge-pos">adj-na; adv</span>
+                </div>
+            </div>
+
+            <div>
+                <div class="info-section">
+                    <h3>💡 释义 (Meanings)</h3>
+                    <p id="wordMeanings">unfortunately; sorry, but...</p>
+                </div>
+
+                <div class="info-section">
+                    <h3>📝 例句 (Examples)</h3>
+                    <p id="wordExamples">あいにくて</p>
+                </div>
+            </div>
+
+            <div class="control-bar">
+                <button id="prevBtn" class="btn-secondary" onclick="changePage(-1)">⬅️ 上一个</button>
+                <button onclick="speakWord()">🔊 朗读单词</button>
+                <button id="nextBtn" class="btn-secondary" onclick="changePage(1)">下一个 ➡️</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 新的多单元（多 Sheet）数据结构
+        let courseSheets = [
+            {
+                sheetName: "示例单元 (N3词汇)",
+                words: [
+                    {
+                        word: "生憎",
+                        reading: "あいにく",
+                        alternate_readings: "",
+                        part_of_speech: "adj-na; adv; n; adj-no",
+                        meanings: "unfortunately; sorry, but...",
+                        jlpt: "N3",
+                        examples: "あいにくて"
+                    },
+                    {
+                        word: "明日",
+                        reading: "あした",
+                        alternate_readings: "あす; みょうにち",
+                        part_of_speech: "n; adv",
+                        meanings: "tomorrow; near future",
+                        jlpt: "N3",
+                        examples: "あしたは晴れるでしょう。"
+                    }
+                ]
+            }
+        ];
+
+        let currentSheetIndex = 0; // 当前选中的 Sheet 索引
+        let currentWordIndex = 0;  // 当前 Sheet 内的单词索引
+
+        // 1. 渲染左侧 Sheet 目录概览
+        function renderSidebar() {
+            const listEl = document.getElementById('sheetList');
+            const badgeEl = document.getElementById('sheetTotalBadge');
+            
+            badgeEl.textContent = `共 ${courseSheets.length} 个单元`;
+            listEl.innerHTML = '';
+
+            courseSheets.forEach((sheet, index) => {
+                const li = document.createElement('li');
+                li.className = `sheet-item ${index === currentSheetIndex ? 'active' : ''}`;
+                li.innerHTML = `
+                    <span>${sheet.sheetName}</span>
+                    <span class="sheet-count">${sheet.words.length} 词</span>
+                `;
+                li.onclick = () => {
+                    currentSheetIndex = index;
+                    currentWordIndex = 0; // 切换单元时从该单元第 1 个词开始
+                    renderSidebar();
+                    renderCard();
+                };
+                listEl.appendChild(li);
+            });
+        }
+
+        // 2. 渲染当前卡片与顶部进度条
+        function renderCard() {
+            const currentSheet = courseSheets[currentSheetIndex];
+            if (!currentSheet || currentSheet.words.length === 0) return;
+
+            const words = currentSheet.words;
+            const data = words[currentWordIndex];
+
+            // 更新单词详情
+            document.getElementById('wordTitle').textContent = data.word || '无词汇';
+            document.getElementById('wordReading').textContent = (data.reading || '') + (data.alternate_readings ? ` (又读: ${data.alternate_readings})` : '');
+            document.getElementById('wordJlpt').textContent = data.jlpt || '常用词';
+            document.getElementById('wordPos').textContent = data.part_of_speech || '词汇';
+            document.getElementById('wordMeanings').textContent = data.meanings || '暂无释义';
+            document.getElementById('wordExamples').textContent = data.examples || '暂无例句';
+
+            // 更新顶部进度条（针对当前 Sheet）
+            const total = words.length;
+            const current = currentWordIndex + 1;
+            const percentage = Math.round((current / total) * 100);
+
+            document.getElementById('currentSheetName').textContent = `当前单元：${currentSheet.sheetName}`;
+            document.getElementById('progressText').textContent = `进度：${current} / ${total} (${percentage}%)`;
+            document.getElementById('progressBar').style.width = `${percentage}%`;
+
+            // 更新翻页按钮状态
+            document.getElementById('prevBtn').disabled = currentWordIndex === 0;
+            document.getElementById('nextBtn').disabled = currentWordIndex === total - 1;
+        }
+
+        // 3. 当前 Sheet 内翻页
+        function changePage(direction) {
+            const words = courseSheets[currentSheetIndex].words;
+            currentWordIndex += direction;
+            if (currentWordIndex < 0) currentWordIndex = 0;
+            if (currentWordIndex >= words.length) currentWordIndex = words.length - 1;
+            renderCard();
+        }
+
+        // 4. 朗读当前单词
+        function speakWord() {
+            const currentSheet = courseSheets[currentSheetIndex];
+            if (!currentSheet || currentSheet.words.length === 0) return;
+            const textToSpeak = currentSheet.words[currentWordIndex].word;
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.lang = 'ja-JP';
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // 5. 导出整个多单元 JSON
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(courseSheets, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "japanese_sheets_course.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        // 6. 处理多 Sheet Excel 或 JSON 导入
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fileName = file.name.toLowerCase();
+
+            if (fileName.endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        if (Array.isArray(imported) && imported.length > 0 && imported[0].words) {
+                            courseSheets = imported;
+                            currentSheetIndex = 0;
+                            currentWordIndex = 0;
+                            renderSidebar();
+                            renderCard();
+                            alert(`🎉 成功导入 ${courseSheets.length} 个学习单元！`);
+                        } else {
+                            alert("❌ JSON 格式不匹配多单元结构。");
+                        }
+                    } catch (err) {
+                        alert("❌ JSON 解析失败");
+                    }
+                };
+                reader.readAsText(file);
+            } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        
+                        const parsedSheets = [];
+                        // 遍历 Excel 中的每一个 Sheet
+                        workbook.SheetNames.forEach(sheetName => {
+                            const worksheet = workbook.Sheets[sheetName];
+                            const jsonRows = XLSX.utils.sheet_to_json(worksheet);
+                            // 只保留非空的工作表
+                            if (jsonRows && jsonRows.length > 0) {
+                                parsedSheets.push({
+                                    sheetName: sheetName,
+                                    words: jsonRows
+                                });
+                            }
+                        });
+
+                        if (parsedSheets.length > 0) {
+                            courseSheets = parsedSheets;
+                            currentSheetIndex = 0;
+                            currentWordIndex = 0;
+                            renderSidebar();
+                            renderCard();
+                            alert(`🎉 成功导入 ${parsedSheets.length} 个 Sheet 学习单元！`);
+                        } else {
+                            alert("❌ 未在 Excel 中检测到有效数据，请检查表格内容。");
+                        }
+                    } catch (err) {
+                        alert("❌ Excel 解析失败，请确保文件未损坏。");
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+            // 清空 input 值，允许重复导入同一个文件进行调试
+            event.target.value = '';
+        }
+
+        window.onload = () => {
+            renderSidebar();
+            renderCard();
+        };
+    </script>
+</body>
+</html>
